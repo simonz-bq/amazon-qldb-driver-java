@@ -64,7 +64,7 @@ public class StatementExecutionIntegTest {
                 return count;
             });
         assertEquals(1, createTableCount);
-
+        Thread.sleep(3000);
         Iterable<String> result = driver.getTableNames();
         for (String tableName : result) {
             assertEquals(Constants.TABLE_NAME, tableName);
@@ -154,7 +154,7 @@ public class StatementExecutionIntegTest {
         try {
             driver.execute(txn -> { txn.execute(createTableQuery); });
         } catch (Exception e) {
-            assertTrue(e.getCause() instanceof BadRequestException);
+            assertTrue(e instanceof BadRequestException);
 
             return;
         }
@@ -566,7 +566,7 @@ public class StatementExecutionIntegTest {
 
         Throwable exception = childThreadException.get();
         assertNotNull(exception);
-        assertTrue(exception.getCause() instanceof OccConflictException);
+        assertTrue(exception instanceof OccConflictException);
 
         // Update document to make sure everything still works after the OCC exception.
         AtomicInteger updatedValue = new AtomicInteger();
@@ -635,7 +635,7 @@ public class StatementExecutionIntegTest {
         try {
             driver.execute(txn -> { txn.execute(deleteQuery); });
         } catch (Exception e) {
-            assertTrue(e.getCause() instanceof BadRequestException);
+            assertTrue(e instanceof BadRequestException);
 
             return;
         }

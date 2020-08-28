@@ -71,7 +71,7 @@ public class IonTypesIntegTest {
                 return count;
             });
         assertEquals(1, createTableCount);
-
+        Thread.sleep(3000);
         Iterable<String> result = driver.getTableNames();
         for (String tableName : result) {
             assertEquals(Constants.TABLE_NAME, tableName);
