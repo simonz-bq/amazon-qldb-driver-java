@@ -46,7 +46,7 @@ import software.amazon.awssdk.services.qldbsession.model.InvalidSessionException
 import software.amazon.awssdk.services.qldbsession.model.QldbSessionException;
 import software.amazon.awssdk.services.qldbsession.model.SendCommandRequest;
 import software.amazon.qldb.exceptions.TransactionAbortedException;
-import software.amazon.qldb.exceptions.TransactionException;
+import software.amazon.qldb.exceptions.ExecuteException;
 
 public class QldbSessionTest {
     private static final String LEDGER = "myLedger";
@@ -104,7 +104,7 @@ public class QldbSessionTest {
         client.queueResponse(QldbSessionException.builder().message("an error").build());
         client.queueResponse(MockResponses.ABORT_RESPONSE);
 
-        assertThrows(TransactionException.class, () -> {
+        assertThrows(ExecuteException.class, () -> {
             // StartTransaction is called at the beginning of the execute method
             qldbSession.execute(txn -> null);
         });
@@ -124,7 +124,7 @@ public class QldbSessionTest {
             // StartTransaction is called at the beginning of the execute method
             try {
                 qldbSession.execute(txn -> null);
-            } catch (TransactionException te) {
+            } catch (ExecuteException te) {
                 assertTrue(te.isISE);
                 assertTrue(te.isRetriable);
                 throw te.cause;
@@ -154,7 +154,7 @@ public class QldbSessionTest {
                     Result result = txnExecutor.execute(statement);
                     return result;
                 });
-            } catch (TransactionException te) {
+            } catch (ExecuteException te) {
                 assertTrue(te.isISE);
                 assertTrue(te.isRetriable);
                 throw te.cause;
@@ -217,7 +217,7 @@ public class QldbSessionTest {
                     txnExecutor.abort();
                     return bufferedResult;
                 });
-            } catch (TransactionException te) {
+            } catch (ExecuteException te) {
                 throw te.cause;
             }
         });
@@ -236,7 +236,7 @@ public class QldbSessionTest {
         client.queueResponse(SdkClientException.builder().message("an Error1").build());
         client.queueResponse(MockResponses.ABORT_RESPONSE);
 
-        assertThrows(TransactionException.class, () -> {
+        assertThrows(ExecuteException.class, () -> {
             try {
                 qldbSession.execute(txn -> {
                     return txn.execute(statement);
@@ -289,7 +289,7 @@ public class QldbSessionTest {
 
         try {
             qldbSession.execute(txn -> txn.execute(statement));
-        } catch (TransactionException e) {
+        } catch (ExecuteException e) {
             assertFalse(e.isAborted);
         } finally {
             assertTrue(client.isQueueEmpty());

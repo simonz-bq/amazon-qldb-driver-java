@@ -140,22 +140,6 @@ public class QldbDriverImplTest {
         assertTrue(returnedValue);
     }
 
-    @Test
-    public void testGettingASessionFailsThenBubbleUpException()  {
-        mockClient.queueResponse(AwsServiceException.builder().message("Issue").build());
-
-
-        QldbDriver qldbDriverImpl = QldbDriver.builder()
-                                              .sessionClientBuilder(mockBuilder)
-                                              .ledger(LEDGER)
-                                              .maxConcurrentTransactions(2)
-                                              .build();
-        assertThrows(AwsServiceException.class,
-            () -> qldbDriverImpl.execute(txn -> {})
-        );
-
-    }
-
     /**
      * When a session in the pool throws InvalidSessionException, the driver goes to the next session
      * in the pool and executes the transaction
@@ -431,25 +415,6 @@ public class QldbDriverImplTest {
                 assertTrue(mockClient.isQueueEmpty());
             }
         });
-    }
-
-    @Test
-    @DisplayName("execute - SHOULD bubble up exception WHEN starting a transaction and retry attemtps exceeded")
-    public void testExecuteWithTransactionAlreadyOpenExceptionAndRetryLimitExceeded() {
-        RetryPolicy retryPolicy = spy(RetryPolicy.none());
-
-        // BadRequestException on start transaction if the transaction somehow is already open
-        final BadRequestException exception = BadRequestException.builder().message("Transaction already open").build();
-        mockClient.queueResponse(exception);
-        mockClient.queueResponse(MockResponses.ABORT_RESPONSE);
-
-        assertThrows(BadRequestException.class, () -> {
-            retryDriver.execute(txnExecutor -> {
-                return txnExecutor.execute(statement);
-            });
-        });
-
-        verify(retryPolicy, never()).backoffStrategy();
     }
 
     @Test

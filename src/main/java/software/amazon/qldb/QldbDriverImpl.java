@@ -29,7 +29,7 @@ import software.amazon.awssdk.services.qldbsession.QldbSessionClient;
 import software.amazon.awssdk.utils.Validate;
 import software.amazon.qldb.exceptions.Errors;
 import software.amazon.qldb.exceptions.QldbDriverException;
-import software.amazon.qldb.exceptions.TransactionException;
+import software.amazon.qldb.exceptions.ExecuteException;
 
 /**
  * Implementation of the QldbDriver.
@@ -137,25 +137,30 @@ class QldbDriverImpl implements QldbDriver {
             throw QldbDriverException.create(Errors.DRIVER_CLOSED.get());
         }
 
+        boolean replaceDeadSession = false;
         int retryAttempt = 0;
-        T returnedValue;
-        QldbSession session = this.getSession();
         while (true) {
+            QldbSession session = null;
             try {
-                returnedValue = session.execute(executor);
+                if (replaceDeadSession) {
+                    session = this.createNewSession();
+                } else {
+                    session = this.getSession();
+                }
+                T returnedValue = session.execute(executor);
                 this.releaseSession(session);
                 return returnedValue;
-            } catch (TransactionException te) {
+            } catch (ExecuteException te) {
                 // If initial session is invalid, always retry once with a new session.
                 if (te.isRetriable && te.isISE && retryAttempt == 0) {
                     logger.debug("Initial session received from pool invalid. Retrying...");
-                    session = this.createNewSession();
+                    replaceDeadSession = true;
                     retryAttempt++;
                     continue;
                 }
                 // Do not retry.
                 if (!te.isRetriable || retryAttempt >= retryPolicy.maxRetries()) {
-                    if (te.isAborted) {
+                    if (te.isAborted && session != null) {
                         this.releaseSession(session);
                     } else {
                         this.poolPermits.release();
@@ -168,15 +173,19 @@ class QldbDriverImpl implements QldbDriver {
                 logger.debug("Errored Transaction ID: {}. Error cause: ", te.txnId, te.cause);
                 if (te.isISE) {
                     logger.debug("Replacing expired session...");
-                    session = this.createNewSession();
-                } else if (!te.isAborted) {
+                    replaceDeadSession = true;
+                } else {
                     logger.debug("Retrying with a different session...");
-                    this.poolPermits.release();
-                    session = this.getSession();
+                    replaceDeadSession = false;
+                    if (te.isAborted) {
+                        this.releaseSession(session);
+                    } else {
+                        this.poolPermits.release();
+                    }
                 }
 
                 try {
-                    RetryPolicyContext context = new RetryPolicyContext((SdkException) te.cause, retryAttempt, te.txnId);
+                    RetryPolicyContext context = new RetryPolicyContext(te.cause, retryAttempt, te.txnId);
                     retrySleep(context, retryPolicy);
                 } catch (Exception e) {
                     this.poolPermits.release();
@@ -219,10 +228,8 @@ class QldbDriverImpl implements QldbDriver {
         try {
             final Session session = Session.startSession(ledgerName, amazonQldbSession);
             return new QldbSession(session, readAhead, ionSystem, executorService);
-        } catch (Exception e) {
-            // If creating a new session fails then don't use a permit!
-            this.poolPermits.release();
-            throw e;
+        } catch (SdkException ase) {
+            throw new ExecuteException(ase, true, false, true, "None");
         }
     }
 

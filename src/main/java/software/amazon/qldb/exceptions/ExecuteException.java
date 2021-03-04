@@ -13,19 +13,21 @@
 
 package software.amazon.qldb.exceptions;
 
+import software.amazon.awssdk.core.exception.SdkException;
+
 /**
- * Exception that contains the context of an error that occurred during a transaction.
+ * Exception that contains the context of an error that occurred during a Execute lifecycle.
  *
  * <p><b>Note</b>: this class is for internal use only.</p>
  */
-public class TransactionException extends RuntimeException {
-    public RuntimeException cause;
+public class ExecuteException extends RuntimeException {
+    public SdkException cause;
     public boolean isRetriable;
     public boolean isAborted;
     public boolean isISE;
     public String txnId;
 
-    public TransactionException(RuntimeException cause, boolean isRetriable, boolean isAborted, boolean isISE, String txnId) {
+    public ExecuteException(SdkException cause, boolean isRetriable, boolean isAborted, boolean isISE, String txnId) {
         this.cause = cause;
         this.isRetriable = isRetriable;
         this.isAborted = isAborted;
